@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "TMPL2TqOtArVz"
-#define BLYNK_TEMPLATE_NAME "Matrix Minds"
-#define BLYNK_AUTH_TOKEN "ebDTvON3KAjl5FToo8J9jhXjkUOy1AS5"
+#define BLYNK_TEMPLATE_ID "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+#define BLYNK_TEMPLATE_NAME "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+#define BLYNK_AUTH_TOKEN "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 #define BLYNK_PRINT Serial
 
@@ -11,8 +11,8 @@
 #include <Adafruit_PWMServoDriver.h>
 
 // ============== بيانات الـ WiFi ==============
-char ssid[] = "POCO X3 NFC";  // Replace with your WiFi SSID
-char pass[] = "poahmedco3";   // Replace with your WiFi Password
+char ssid[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";  // Replace with your WiFi SSID
+char pass[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";   // Replace with your WiFi Password
 
 // ============== Car Motor Driver L298N ==============
 #define ENA 23
