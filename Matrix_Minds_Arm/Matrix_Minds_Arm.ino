@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-#define BLYNK_TEMPLATE_NAME "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-#define BLYNK_AUTH_TOKEN "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+#define BLYNK_TEMPLATE_ID "TMPL2TqOtArVz"
+#define BLYNK_TEMPLATE_NAME "Matrix Minds"
+#define BLYNK_AUTH_TOKEN "ebDTvON3KAjl5FToo8J9jhXjkUOy1AS5"
 
 #define BLYNK_PRINT Serial
 
@@ -9,10 +9,11 @@
 #include <WiFiClient.h>
 #include <BlynkSimpleEsp32.h>
 #include <Adafruit_PWMServoDriver.h>
+#include <Ultrasonic.h>
 
 // ============== بيانات الـ WiFi ==============
-char ssid[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";  // Replace with your WiFi SSID
-char pass[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";   // Replace with your WiFi Password
+char ssid[] = "POCO X3 NFC";  // Replace with your WiFi SSID
+char pass[] = "poahmedco3";   // Replace with your WiFi Password
 
 // ============== Car Motor Driver L298N ==============
 #define ENA 23
@@ -22,7 +23,14 @@ char pass[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";   // Replace with your WiFi Passwo
 #define IN3 18
 #define IN4 19
 const int Car_freq = 1000;
+int car_speed = 180;
 const int resolution = 8;
+
+// ============== Ultrasonic Sensor HC-SR04 ==============
+Ultrasonic ultrasonic(12, 13);
+bool goingForward = false;
+int distance = 0;
+BlynkTimer timer;
 
 // ============== Color Sensor TCS3200 ==============
 #define TCS_S0 14
@@ -67,7 +75,31 @@ const uint8_t NUM_SERVOS = 6;
 const uint8_t servoChannel[NUM_SERVOS] = { 0, 2, 4, 6, 8, 10 };
 
 // ============== زوايا البداية (Home Position) ==============
-const int homeAngles[NUM_SERVOS] = { 90, 90, 90, 90, 90, 30 };
+const int homeAngles[NUM_SERVOS] = { 100, 180, 160, 90, 40, 50 };
+
+// ============== زوايا المسك (Pick Position) ==============
+const int pickAngles[NUM_SERVOS] = { 100, 40, 150, 90, 80, 100 };
+const int pickAnglesClose[NUM_SERVOS] = { 100, 40, 150, 90, 80, 50 };
+
+// ============== زوايا المسك (Release Red Position) ==============
+const int TurnReleaseAnglesRed[NUM_SERVOS] = { 180, 180, 160, 90, 40, 50 };
+const int ReleaseAnglesRed[NUM_SERVOS] = { 180, 40, 150, 90, 80, 50 };
+const int releaseAnglesRedOpen[NUM_SERVOS] = { 180, 40, 150, 90, 80, 100 };
+
+// ============== زوايا المسك (Release Green Position) ==============
+const int TurnReleaseAnglesGreen[NUM_SERVOS] = { 130, 180, 160, 90, 40, 50 };
+const int ReleaseAnglesGreen[NUM_SERVOS] = { 130, 40, 150, 90, 80, 50 };
+const int releaseAnglesGreenOpen[NUM_SERVOS] = { 130, 40, 150, 90, 80, 100 };
+
+// ============== زوايا المسك (Release Blue Position) ==============
+const int TurnReleaseAnglesBlue[NUM_SERVOS] = { 50, 180, 160, 90, 40, 50 };
+const int ReleaseAnglesBlue[NUM_SERVOS] = { 50, 40, 150, 90, 80, 50 };
+const int releaseAnglesBlueOpen[NUM_SERVOS] = { 50, 40, 150, 90, 80, 100 };
+
+// ============== زوايا المسك (Release Other Color Position) ==============
+const int TurnReleaseAnglesOther[NUM_SERVOS] = { 0, 180, 160, 90, 40, 50 };
+const int ReleaseAnglesOther[NUM_SERVOS] = { 0, 40, 150, 90, 80, 50 };
+const int releaseAnglesOtherOpen[NUM_SERVOS] = { 0, 40, 150, 90, 80, 100 };
 
 // ============== حدود كل سيرفو (Min / Max) بالدرجات ==============
 const int minAngles[NUM_SERVOS] = { 0, 0, 0, 0, 0, 25 };
@@ -97,15 +129,28 @@ unsigned long lastStepTime = 0;
 
 // ================================================================================================================ نهاية التوصيلات
 
-// =================================================== Car Controls ===================================================
-BLYNK_WRITE(V16) {  // زرار يتحرك قدام
-  int state = param.asInt();
+// ================================================================================== Ultrasonic Function ======================================================================
 
-  if (state == 1) {  // لما تضغط
-    MV_Forward();
-  } else {
+void ReadDistance() {
+  distance = ultrasonic.read();
+  Blynk.virtualWrite(V20, distance);
+
+  // لو العربية ماشية قدام وفيه عائق → وقف
+  if (goingForward && distance <= 20) {
     Stop_Car();
   }
+  // لو العائق اتشال والزرار لسه مضغوط → امشي
+  else if (goingForward && distance > 20) {
+    MV_Forward();
+  }
+}
+
+// ==================================================================================== Car Controls ===========================================================================
+// متغير بيحفظ حالة زرار الأمام
+
+BLYNK_WRITE(V16) {
+  goingForward = param.asInt(); // 1 = مضغوط، 0 = متلقيش
+  if (!goingForward) Stop_Car();
 }
 
 BLYNK_WRITE(V17) {  // زرار يرجع ورا
@@ -138,7 +183,6 @@ BLYNK_WRITE(V18) {  // زرار يلف شمال
   }
 }
 
-int car_speed = 255;
 BLYNK_WRITE(V15) {  // التحكم في السرعة
   car_speed = param.asInt();
   ledcWrite(ENA, car_speed);
@@ -146,6 +190,8 @@ BLYNK_WRITE(V15) {  // التحكم في السرعة
 }
 
 void MV_Forward() {
+  ledcWrite(ENA, car_speed);
+  ledcWrite(ENB, car_speed);
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, HIGH);
@@ -153,6 +199,8 @@ void MV_Forward() {
 }
 
 void MV_Backward() {
+  ledcWrite(ENA, car_speed);
+  ledcWrite(ENB, car_speed);
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW);
@@ -160,6 +208,8 @@ void MV_Backward() {
 }
 
 void T_Right() {
+  ledcWrite(ENA, car_speed);
+  ledcWrite(ENB, car_speed);
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, HIGH);
@@ -167,6 +217,8 @@ void T_Right() {
 }
 
 void T_Left() {
+  ledcWrite(ENA, car_speed);
+  ledcWrite(ENB, car_speed);
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
@@ -180,7 +232,7 @@ void Stop_Car() {
   digitalWrite(IN4, LOW);
 }
 
-// =================================================== Color Sensor ===================================================
+// ================================================================================ Color Sensor ========================================================================
 uint32_t readChannel(bool s2, bool s3) {
 
   digitalWrite(TCS_S2, s2);
@@ -307,7 +359,7 @@ BLYNK_WRITE(V13)
     sensorEnabled = param.asInt();
 }
 
-// ============== Robot Arm ==============
+// ================================================================================ Robot Arm ===============================================================================
 // ---------------------------------------------------------
 // تحويل زاوية (0-180) لقيمة Pulse تفهمها PCA9685، وكتابتها
 // مباشرة على القناة بتاعة السيرفو ده
@@ -395,9 +447,7 @@ void moveArmSmoothTo(const int targetSet[NUM_SERVOS]) {
   }
 }
 
-// ===========================================================
-//          Blynk Virtual Pin Handlers (الأزرار الـ 12)
-// ===========================================================
+//================================================================ Blynk Virtual Pin Handlers (الأزرار الـ 12)===================================================================
 BLYNK_WRITE(V0) {
   buttonState[0][1] = param.asInt();
 }  // Base +
@@ -448,9 +498,59 @@ BLYNK_WRITE(V12) {
   }
 }
 
-// ===========================================================
-//                          SETUP
-// ===========================================================
+BLYNK_WRITE(V21){
+  int pressed = param.asInt();
+  if (pressed == 1 && sensorEnabled == true) {
+    
+    RGBData raw = readRGB();
+    int r, g, b;
+    normalizeRGB(raw, r, g, b);
+    String detected = detectColor(r, g, b, raw.clear);
+
+    moveArmSmoothTo(pickAngles);
+    delay(500);
+    moveArmSmoothTo(pickAnglesClose);
+    delay(500);
+    moveArmSmoothTo(homeAngles);
+    delay(500);
+
+    if(detected == "RED"){
+      moveArmSmoothTo(TurnReleaseAnglesRed);
+      delay(500);
+      moveArmSmoothTo(ReleaseAnglesRed);
+      delay(500);
+      moveArmSmoothTo(releaseAnglesRedOpen);
+      delay(500);
+    }else if(detected == "GREEN"){
+      moveArmSmoothTo(TurnReleaseAnglesGreen);
+      delay(500);
+      moveArmSmoothTo(ReleaseAnglesGreen);
+      delay(500);
+      moveArmSmoothTo(releaseAnglesGreenOpen);
+      delay(500);
+    }else if(detected == "BLUE"){
+      moveArmSmoothTo(TurnReleaseAnglesBlue);
+      delay(500);
+      moveArmSmoothTo(ReleaseAnglesBlue);
+      delay(500);
+      moveArmSmoothTo(releaseAnglesBlueOpen);
+      delay(500);
+    }else{
+      moveArmSmoothTo(TurnReleaseAnglesOther);
+      delay(500);
+      moveArmSmoothTo(ReleaseAnglesOther);
+      delay(500);
+      moveArmSmoothTo(releaseAnglesOtherOpen);
+      delay(500);
+    }
+
+    moveArmSmoothTo(homeAngles);
+
+  }
+}
+
+//===================================================================================================== SETUP ===================================================================
+
 void setup() {
   Serial.begin(115200);
 
@@ -461,7 +561,11 @@ void setup() {
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
-  Blynk.virtualWrite(V13, 255);
+  ledcWrite(ENA, car_speed);
+  ledcWrite(ENB, car_speed);
+  
+  // Ultrasonic
+  timer.setInterval(50L ,ReadDistance); //الدالة هتشتغل كل 50 ميلي ثانية 
 
   // ================= TCS3200 Color Sensor ====================
   pinMode(TCS_S0, OUTPUT);
@@ -506,11 +610,10 @@ void setup() {
   Serial.println("Arm is at HOME position. Ready for joystick control.");
 }
 
-// ===========================================================
-//                           LOOP
-// ===========================================================
+//================================================================================================= LOOP =======================================================================
 void loop() {
   Blynk.run();
+  timer.run();
 
   // خطوات حركة الذراع
   unsigned long now = millis();
@@ -522,18 +625,22 @@ void loop() {
 
   // تشغيل و ايقاف السنسور
   static unsigned long lastTime = 0;
+  static bool prevSensorEnabled = true;
 
-    if (sensorEnabled && millis() - lastTime >= 1000)
-    {
-        lastTime = millis();
+  if (sensorEnabled && millis() - lastTime >= 1000)
+  {
+    lastTime = millis();
 
-        RGBData raw = readRGB();
+    RGBData raw = readRGB();
 
-        int r, g, b;
-        normalizeRGB(raw, r, g, b);
+    int r, g, b;
+    normalizeRGB(raw, r, g, b);
 
-        String detected = detectColor(r, g, b, raw.clear);
+    String detected = detectColor(r, g, b, raw.clear);
 
-        Blynk.virtualWrite(V14, detected);
-    }
+    Blynk.virtualWrite(V14, detected);
+  } else if (!sensorEnabled && prevSensorEnabled != sensorEnabled) {
+    Blynk.virtualWrite(V14, "Sensor Off");
+  }
+  prevSensorEnabled = sensorEnabled;
 }
